@@ -1,0 +1,48 @@
+0 info it worked if it ends with ok
+1 verbose cli [ 'node', '/usr/local/bin/npm', 'install', '-g', 'plugman' ]
+2 info using npm@2.13.3
+3 info using node@v0.12.0
+4 verbose install initial load of /usr/local/lib/package.json
+5 verbose readDependencies loading dependencies from /usr/local/lib/package.json
+6 silly cache add args [ 'plugman', null ]
+7 verbose cache add spec plugman
+8 silly cache add parsed spec { raw: 'plugman',
+8 silly cache add   scope: null,
+8 silly cache add   name: 'plugman',
+8 silly cache add   rawSpec: '',
+8 silly cache add   spec: '*',
+8 silly cache add   type: 'range' }
+9 silly addNamed plugman@*
+10 verbose addNamed "*" is a valid semver range for plugman
+11 silly addNameRange { name: 'plugman', range: '*', hasData: false }
+12 silly mapToRegistry name plugman
+13 silly mapToRegistry using default registry
+14 silly mapToRegistry registry https://registry.npmjs.org/
+15 silly mapToRegistry uri https://registry.npmjs.org/plugman
+16 verbose addNameRange registry:https://registry.npmjs.org/plugman not in flight; fetching
+17 verbose request uri https://registry.npmjs.org/plugman
+18 verbose request no auth needed
+19 info attempt registry request try #1 at 1:47:01 PM
+20 verbose request id 8ed3e5e91c1190d4
+21 http request GET https://registry.npmjs.org/plugman
+22 info retry will retry, error on last attempt: Error: certificate not trusted
+23 info attempt registry request try #2 at 1:47:11 PM
+24 http request GET https://registry.npmjs.org/plugman
+25 info retry will retry, error on last attempt: Error: certificate not trusted
+26 info attempt registry request try #3 at 1:48:11 PM
+27 http request GET https://registry.npmjs.org/plugman
+28 verbose stack Error: certificate not trusted
+28 verbose stack     at Error (native)
+28 verbose stack     at TLSSocket.<anonymous> (_tls_wrap.js:927:36)
+28 verbose stack     at TLSSocket.emit (events.js:104:17)
+28 verbose stack     at TLSSocket._finishInit (_tls_wrap.js:458:8)
+29 verbose cwd /Users/rpopa/Programming/RFID-Plugin
+30 error Darwin 14.5.0
+31 error argv "node" "/usr/local/bin/npm" "install" "-g" "plugman"
+32 error node v0.12.0
+33 error npm  v2.13.3
+34 error code CERT_UNTRUSTED
+35 error certificate not trusted
+36 error If you need help, you may report this error at:
+36 error     <https://github.com/npm/npm/issues>
+37 verbose exit [ 1, true ]

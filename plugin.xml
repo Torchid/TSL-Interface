@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        id="com-saskpower-mobility-tslinterface" version="0.0.1">
+    <name>TSLInterface</name>
+    <description>TSL Interface Plugin</description>
+    <license>Apache 2.0</license>
+    <keywords>cordova,rfid</keywords>
+    <engines>
+        <engine name="cordova" version=">=3.6.0"/>
+    </engines>
+    <js-module src="www/TSLInterface.js" name="TSLInterface">
+        <clobbers target="TSLInterface" />
+    </js-module>
+
+    <platform name="ios">
+        <config-file target="config.xml" parent="/*">
+            <feature name="TSLInterface">
+                <param name="ios-package" value="TSLInterface"/>
+            </feature>
+        </config-file>
+        
+        <header-file src="src/ios/TSLInterface.h" />
+        <source-file src="src/ios/TSLInterface.m" />
+    </platform>
+</plugin>
