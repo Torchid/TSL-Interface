@@ -9,7 +9,7 @@
         <engine name="cordova" version=">=3.6.0"/>
     </engines>
     <js-module src="www/TSLInterface.js" name="TSLInterface">
-        <clobbers target="window.TSLInterface" />
+        <clobbers target="window.background.RFIDGun" />
     </js-module>
 
     <platform name="ios">
