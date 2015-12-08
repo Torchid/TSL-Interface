@@ -1,2 +1,16 @@
 Notes:
 * Bitcode must be disabled in XCode
+
+Example - How to Use the Plugin:
+
+var rfidResult = "";
+
+var success = function(tagMsg){
+    rfidResult = tagMsg;
+};
+
+var fail = function(err){
+    alert("Fail");
+}; 
+
+window.background.RFIDGun.pair(success, fail);

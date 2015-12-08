@@ -35,12 +35,10 @@
 {
     _pluginResult = nil;
     _command = command;
-    NSString* echo = [command.arguments objectAtIndex:0];
+    _partialResultMessage = @"";
     
     _transpondersSeen = 0;
     
-    
-    echo = @"Entered pair function.";
     NSLog(@"Entered pair functions!");
     
     // Create the TSLAsciiCommander used to communicate with the TSL Reader
@@ -56,9 +54,8 @@
     
     if(_accessoryList.count > 0) {
         
-        echo = [NSString stringWithFormat:@"Accessory list has %ld items", _accessoryList.count];
+        NSLog(@"Accessory list has %ld items", _accessoryList.count);
         
-        NSLog(echo);
         // Connect to the chosen TSL Reader
         _currentAccessory = _accessoryList[_chosenDeviceIndex];
         
@@ -66,8 +63,7 @@
         if( _commander.isConnected )
         {
             // Issue commands to the reader
-            echo = @"Command is connected!";
-            NSLog(echo);
+            NSLog(@"Command is connected!");
             
             // Add a logger to the commander to output all reader responses to the log file
             [_commander addResponder:[[TSLLoggerResponder alloc] init]];
@@ -134,42 +130,25 @@
 //
 // Note: This is an asynchronous call from a separate thread
 //
-// -(void)transponderReceived:(NSString *)epc crc:(NSNumber *)crc pc:(NSNumber *)pc rssi:(NSNumber *)rssi fastId:(NSData *)fastId moreAvailable:(BOOL)moreAvailable
-// {
-//     NSLog(@"TransponderReceived Called");
-//     // Append the transponder EPC identifier and RSSI to the results
-//     _partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"%-28s  %4d\n", [epc UTF8String], [rssi intValue]];
-//     if( fastId != nil)
-//     {
-//         _partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"%-6@  %@\n", @"TID:", [TSLBinaryEncoding toBase16String:fastId]];
-//     }
+-(void)transponderReceived:(NSString *)epc crc:(NSNumber *)crc pc:(NSNumber *)pc rssi:(NSNumber *)rssi fastId:(NSData *)fastId moreAvailable:(BOOL)moreAvailable
+{
+    NSLog(@"transponderReceived Called");
+    // Append the transponder EPC identifier and RSSI to the results
+    //_partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"%-28s  %4d\n", [epc UTF8String], [rssi intValue]];
     
-//     _transpondersSeen++;
+    _partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"%-28s\n", [epc UTF8String]];
+
+    _transpondersSeen++;
     
-//     // If this is the last transponder add a few blank lines
-//     if( !moreAvailable )
-//     {
-//         _partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"\nTransponders seen: %ld\n\n", (long)_transpondersSeen];
-//         _transpondersSeen = 0;
-//     }
+    NSLog(@"Partial Result Message: %@", _partialResultMessage);
+    if (_partialResultMessage != nil && [_partialResultMessage length] > 0) {
+        _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:_partialResultMessage];
+    } else {
+        _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
+    }
     
-//     // This changes UI elements so perform it on the UI thread
-//     // Avoid sending too many screen updates as it can stall the display
-//     if( _transpondersSeen < 3 || _transpondersSeen % 10 == 0 )
-//     {
-//         [self performSelectorOnMainThread: @selector(updateResults:) withObject:_partialResultMessage waitUntilDone:NO];
-//         _partialResultMessage = @"";
-//     }
-    
-    
-//     if (_partialResultMessage != nil && [_partialResultMessage length] > 0) {
-//         _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:_partialResultMessage];
-//     } else {
-//         _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
-//     }
-    
-//     [self.commandDelegate sendPluginResult:_pluginResult callbackId:_command.callbackId];
-// }
+    [self.commandDelegate sendPluginResult:_pluginResult callbackId:_command.callbackId];
+}
 
 
 
