@@ -1,17 +1,30 @@
 //
 //  TSLInterface.m
-//  
+//
 //  Parameters of CDVInvokedUrl Command should be:
 // 	1.  Java function that takes in a string as a parameter
 
 
 #import <TSLAsciiCommands/TSLAsciiCommander.h>
+#import <TSLAsciiCommands/TSLInventoryCommand.h>
+#import <TSLAsciiCommands/TSLLoggerResponder.h>
+#import <TSLAsciiCommands/TSLFactoryDefaultsCommand.h>
+#import <TSLAsciiCommands/TSLVersionInformationCommand.h>
+#import <TSLAsciiCommands/TSLBinaryEncoding.h>
 #import <Cordova/CDV.h>
 #import "TSLInterface.h"
 
 @interface TSLInterface ()
 {
-    NSString* javaScriptMethod;
+    TSLAsciiCommander* _commander;
+    TSLInventoryCommand* _inventoryResponder;
+    CDVPluginResult* _pluginResult;
+    CDVInvokedUrlCommand* _command;
+    EAAccessory* _currentAccessory;
+    NSArray * _accessoryList;
+    NSInteger _chosenDeviceIndex;
+    NSInteger _transpondersSeen;
+    NSString* _partialResultMessage;
 }
 
 @end
@@ -20,22 +33,156 @@
 
 -(void)pair:(CDVInvokedUrlCommand*)command
 {
-    CDVPluginResult* pluginResult = nil;
+    _pluginResult = nil;
+    _command = command;
     NSString* echo = [command.arguments objectAtIndex:0];
-
-    if (echo != nil && [echo length] > 0) {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:echo];
-    } else {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
+    
+    _transpondersSeen = 0;
+    
+    
+    echo = @"Entered pair function.";
+    NSLog(@"Entered pair functions!");
+    
+    // Create the TSLAsciiCommander used to communicate with the TSL Reader
+    _commander = [[TSLAsciiCommander alloc] init];
+    
+    
+    _chosenDeviceIndex = 0;
+    
+    _accessoryList = [[EAAccessoryManager sharedAccessoryManager] connectedAccessories];
+    
+    // Disconnect from the current reader, if any
+    [_commander disconnect];
+    
+    if(_accessoryList.count > 0) {
+        
+        echo = [NSString stringWithFormat:@"Accessory list has %ld items", _accessoryList.count];
+        
+        NSLog(echo);
+        // Connect to the chosen TSL Reader
+        _currentAccessory = _accessoryList[_chosenDeviceIndex];
+        
+        [_commander connect:_currentAccessory];
+        if( _commander.isConnected )
+        {
+            // Issue commands to the reader
+            echo = @"Command is connected!";
+            NSLog(echo);
+            
+            // Add a logger to the commander to output all reader responses to the log file
+            [_commander addResponder:[[TSLLoggerResponder alloc] init]];
+            
+            // Some synchronous commands will be used in the app
+            [_commander addSynchronousResponder];
+            
+            // Performing an inventory could potentially take a long time if many transponders are in range so it is best to handle responses asynchronously
+            //
+            // The TSLInventoryCommand is a TSLAsciiResponder for inventory responses and can have a delegate
+            // (id<TSLInventoryCommandTransponderReceivedDelegate>) that is informed of each transponder as it is received
+            
+            // Create a TSLInventoryCommand
+            _inventoryResponder = [[TSLInventoryCommand alloc] init];
+            
+            // Add self as the transponder delegate
+            _inventoryResponder.transponderReceivedDelegate = self;
+            
+            // Pulling the Reader trigger will generate inventory responses that are not from the library.
+            // To ensure these are also seen requires explicitly requesting handling of non-library command responses
+            _inventoryResponder.captureNonLibraryResponses = YES;
+            
+            // Add the inventory responder to the commander's responder chain
+            [_commander addResponder:_inventoryResponder];
+            
+            // Ensure the reader is in a known (default) state
+            // No information is returned by the reset command other than its succesful completion
+            TSLFactoryDefaultsCommand * resetCommand = [TSLFactoryDefaultsCommand synchronousCommand];
+            
+            [_commander executeCommand:resetCommand];
+            
+            // Notify user device has been reset
+            if( resetCommand.isSuccessful )
+            {
+                NSLog(@"Reader reset to Factory Defaults\n");
+            }
+            else
+            {
+                NSLog(@"!!! Unable to reset reader to Factory Defaults !!!\n");
+            }
+            
+            // Get version information for the reader
+            // Use the TSLVersionInformationCommand synchronously as the returned information is needed below
+            TSLVersionInformationCommand * versionCommand = [TSLVersionInformationCommand synchronousCommand];
+            
+            [_commander executeCommand:versionCommand];
+            
+            // Log some of the values obtained
+            NSLog( @"\n%-16s %@\n%-16s %@\n%-16s %@\n\n\n",
+                  "Manufacturer:", versionCommand.manufacturer,
+                  "Serial Number:", versionCommand.serialNumber,
+                  "Antenna SN:", versionCommand.antennaSerialNumber
+                  );
+            
+        }
     }
-
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    
 }
 
-// -(void)writeTagData:(NSString*)tagData
+//
+// Each transponder received from the reader is passed to this method
+//
+// Parameters epc, crc, pc, and rssi may be nil
+//
+// Note: This is an asynchronous call from a separate thread
+//
+// -(void)transponderReceived:(NSString *)epc crc:(NSNumber *)crc pc:(NSNumber *)pc rssi:(NSNumber *)rssi fastId:(NSData *)fastId moreAvailable:(BOOL)moreAvailable
 // {
-    // NSString* jsMethodCall = [NSString stringWithFormat:@"%@(\"%@\")", javaScriptMethod, tagData];
-	//[webAView stringByEvaluatingJavaScriptFromString:jsMethodCall];
+//     NSLog(@"TransponderReceived Called");
+//     // Append the transponder EPC identifier and RSSI to the results
+//     _partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"%-28s  %4d\n", [epc UTF8String], [rssi intValue]];
+//     if( fastId != nil)
+//     {
+//         _partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"%-6@  %@\n", @"TID:", [TSLBinaryEncoding toBase16String:fastId]];
+//     }
+    
+//     _transpondersSeen++;
+    
+//     // If this is the last transponder add a few blank lines
+//     if( !moreAvailable )
+//     {
+//         _partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"\nTransponders seen: %ld\n\n", (long)_transpondersSeen];
+//         _transpondersSeen = 0;
+//     }
+    
+//     // This changes UI elements so perform it on the UI thread
+//     // Avoid sending too many screen updates as it can stall the display
+//     if( _transpondersSeen < 3 || _transpondersSeen % 10 == 0 )
+//     {
+//         [self performSelectorOnMainThread: @selector(updateResults:) withObject:_partialResultMessage waitUntilDone:NO];
+//         _partialResultMessage = @"";
+//     }
+    
+    
+//     if (_partialResultMessage != nil && [_partialResultMessage length] > 0) {
+//         _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:_partialResultMessage];
+//     } else {
+//         _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
+//     }
+    
+//     [self.commandDelegate sendPluginResult:_pluginResult callbackId:_command.callbackId];
 // }
+
+
+
+- (void)applicationDidEnterBackground:(UIApplication *)application
+{
+    [_commander disconnect];
+}
+
+- (void)applicationDidBecomeActive:(UIApplication *)application
+{
+    // Attempt to reconnect to the last used accessory
+    [_commander connect:nil];
+}
+
 
 @end
