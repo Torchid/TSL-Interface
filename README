@@ -1,16 +1,37 @@
-Notes:
-* Bitcode must be disabled in XCode
+*** Bitcode must be disabled in XCode:
 
-Example - How to Use the Plugin:
+	Target > Build Settings > Build Options > Enable Bitcode: No
 
-var rfidResult = "";
+*** .plist file must be configured to support the following external protocol:
 
-var success = function(tagMsg){
-    rfidResult = tagMsg;
-};
+<key>UISupportedExternalAccessoryProtocols</key>
+	<array>
+		<string>com.uk.tsl.rfid</string>
+	</array>
 
-var fail = function(err){
-    alert("Fail");
-}; 
+*** The following Frameworks are needed:
 
-window.background.RFIDGun.pair(success, fail);
+	ExternalAccessory.framework
+	TSLAsciiCommands.framework
+	UIKit.framework
+	Foundation.framework
+	CoreGraphics.framework
+
+*** Install the plugin 
+	
+	
+
+*** Example - How to Use the Plugin:
+
+	var rfidResult = "";
+
+	//tagMsg will be the data read off of the NFC tag
+	var success = function(tagMsg){
+	    rfidResult = tagMsg;
+	};
+
+	var fail = function(err){
+	    alert("Fail");
+	}; 
+
+	window.background.RFIDGun.pair(success, fail);

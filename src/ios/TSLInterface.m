@@ -1,9 +1,6 @@
 //
 //  TSLInterface.m
 //
-//  Parameters of CDVInvokedUrl Command should be:
-// 	1.  Java function that takes in a string as a parameter
-
 
 #import <TSLAsciiCommands/TSLAsciiCommander.h>
 #import <TSLAsciiCommands/TSLInventoryCommand.h>
@@ -16,14 +13,23 @@
 
 @interface TSLInterface ()
 {
+	//Controls connection to TSL Reader
     TSLAsciiCommander* _commander;
     TSLInventoryCommand* _inventoryResponder;
+
     CDVPluginResult* _pluginResult;
     CDVInvokedUrlCommand* _command;
+
+    //Device that _commander is connected to
     EAAccessory* _currentAccessory;
+
+    //List of available devices connected to phone via Bluetooth
     NSArray * _accessoryList;
+    //Index of device that commander will connect to
     NSInteger _chosenDeviceIndex;
+    //Number of tags read in a scan
     NSInteger _transpondersSeen;
+    //String to hold tag data to be returned to main app
     NSString* _partialResultMessage;
 }
 
@@ -130,6 +136,7 @@
 //
 // Note: This is an asynchronous call from a separate thread
 //
+// TEST: Currently only looking at epc result
 -(void)transponderReceived:(NSString *)epc crc:(NSNumber *)crc pc:(NSNumber *)pc rssi:(NSNumber *)rssi fastId:(NSData *)fastId moreAvailable:(BOOL)moreAvailable
 {
     NSLog(@"transponderReceived Called");
@@ -150,7 +157,8 @@
     [self.commandDelegate sendPluginResult:_pluginResult callbackId:_command.callbackId];
 }
 
-
+//Following methods control commander when app enters and exits background.  Not yet sure if these
+//are helpful for a Cordova project.
 
 - (void)applicationDidEnterBackground:(UIApplication *)application
 {
