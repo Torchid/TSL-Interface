@@ -13,16 +13,16 @@
 
 @interface TSLInterface ()
 {
-	//Controls connection to TSL Reader
+    //Controls connection to TSL Reader
     TSLAsciiCommander* _commander;
     TSLInventoryCommand* _inventoryResponder;
-
+    
     CDVPluginResult* _pluginResult;
     CDVInvokedUrlCommand* _command;
-
+    
     //Device that _commander is connected to
     EAAccessory* _currentAccessory;
-
+    
     //List of available devices connected to phone via Bluetooth
     NSArray * _accessoryList;
     //Index of device that commander will connect to
@@ -143,8 +143,9 @@
     // Append the transponder EPC identifier and RSSI to the results
     //_partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"%-28s  %4d\n", [epc UTF8String], [rssi intValue]];
     
+    _partialResultMessage = @"";
     _partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"%-28s\n", [epc UTF8String]];
-
+    
     _transpondersSeen++;
     
     NSLog(@"Partial Result Message: %@", _partialResultMessage);
@@ -154,6 +155,7 @@
         _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
     }
     
+    [_pluginResult setKeepCallbackAsBool:YES];
     [self.commandDelegate sendPluginResult:_pluginResult callbackId:_command.callbackId];
 }
 
