@@ -143,20 +143,30 @@
     // Append the transponder EPC identifier and RSSI to the results
     //_partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"%-28s  %4d\n", [epc UTF8String], [rssi intValue]];
     
-    _partialResultMessage = @"";
-    _partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"%-28s\n", [epc UTF8String]];
+    // _partialResultMessage = @"";
+    _partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"%-24s", [epc UTF8String]];
     
+    if (moreAvailable) {
+        _partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"--"];
+    }
     _transpondersSeen++;
     
-    NSLog(@"Partial Result Message: %@", _partialResultMessage);
-    if (_partialResultMessage != nil && [_partialResultMessage length] > 0) {
-        _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:_partialResultMessage];
-    } else {
-        _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
-    }
+    // If this is the last transponder send the results back to the app
+    if( !moreAvailable )
+    {
+        NSLog(@"Result Message: %@", _partialResultMessage);
+        if (_partialResultMessage != nil && [_partialResultMessage length] > 0) {
+            _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:_partialResultMessage];
+        } else {
+            _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
+        }
+        
+        [_pluginResult setKeepCallbackAsBool:YES];
+        [self.commandDelegate sendPluginResult:_pluginResult callbackId:_command.callbackId];
     
-    [_pluginResult setKeepCallbackAsBool:YES];
-    [self.commandDelegate sendPluginResult:_pluginResult callbackId:_command.callbackId];
+        _transpondersSeen = 0;
+        _partialResultMessage = @"";
+    }
 }
 
 //Following methods control commander when app enters and exits background.  Not yet sure if these
