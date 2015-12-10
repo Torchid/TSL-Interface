@@ -123,7 +123,13 @@
                   "Serial Number:", versionCommand.serialNumber,
                   "Antenna SN:", versionCommand.antennaSerialNumber
                   );
-            
+
+
+            _partialResultMessage = [NSString stringWithFormat:@"%@ is connected.", versionCommand.serialNumber];
+            _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:_partialResultMessage];
+            [_pluginResult setKeepCallbackAsBool:YES];
+            [self.commandDelegate sendPluginResult:_pluginResult callbackId:_command.callbackId];
+            _partialResultMessage = @"";
         }
     }
     
