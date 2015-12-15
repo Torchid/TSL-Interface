@@ -17,9 +17,9 @@
 	Foundation.framework
 	CoreGraphics.framework
 
-### Install the plugin 
-	
-	
+### Install the plugin
+
+cordova plugin add https://github.com/Torchid/TSL-Interface.git
 
 ### Example - How to Use the Plugin:
 
@@ -32,6 +32,6 @@
 
 	var fail = function(err){
 	    alert("Fail");
-	}; 
+	};
 
 	window.background.RFIDGun.pair(success, fail);
