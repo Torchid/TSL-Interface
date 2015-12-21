@@ -8,6 +8,7 @@
 #import <TSLAsciiCommands/TSLFactoryDefaultsCommand.h>
 #import <TSLAsciiCommands/TSLVersionInformationCommand.h>
 #import <TSLAsciiCommands/TSLBinaryEncoding.h>
+#import <TSLAsciiCommands/TSLWriteSingleTransponderCommand.h>
 #import <Cordova/CDV.h>
 #import "TSLInterface.h"
 
@@ -17,9 +18,10 @@
     TSLAsciiCommander* _commander;
     TSLInventoryCommand* _inventoryResponder;
     EAAccessory* _rfidGun;
+    BOOL _inWriteMode;
     
-    CDVPluginResult* _pluginResult;
     CDVInvokedUrlCommand* _command;
+    CDVPluginResult* _pluginResult;
     
     //List of available devices connected to phone via Bluetooth
     NSArray * _accessoryList;
@@ -37,19 +39,22 @@
 
 @implementation TSLInterface
 
--(void)pair:(CDVInvokedUrlCommand*)command
+-(void)pair:(CDVInvokedUrlCommand*)cordovaComm
 {
     [self.commandDelegate runInBackground:^{
         _pluginResult = nil;
-        _command = command;
         _resultMessage = @"";
         _transpondersSeen = 0;
         _rfidScanners = @[@"1128"];
-
+        _inWriteMode = false;
+        //Store the command so the transponder receiver can access it to
+        //send back tag data to the main app.
+        _command = cordovaComm;
+        
         // Create the TSLAsciiCommander used to communicate with the TSL Reader
         _commander = [[TSLAsciiCommander alloc] init];
         _accessoryList = [[EAAccessoryManager sharedAccessoryManager] connectedAccessories];
-            
+        
         do
         {
             // Disconnect from the current reader, if any
@@ -72,43 +77,43 @@
                 NSLog(@"Scanner not found.");
                 _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:_resultMessage];
                 [_pluginResult setKeepCallbackAsBool:YES];
-                [self.commandDelegate sendPluginResult:_pluginResult callbackId:_command.callbackId];
+                [self.commandDelegate sendPluginResult:_pluginResult callbackId:cordovaComm.callbackId];
                 _resultMessage = @"";
                 [NSThread sleepForTimeInterval:2.0f];
             }
         }while(!_commander.isConnected);
-
+        
         // Issue commands to the reader
         NSLog(@"Commander is connected!");
-
+        
         // Add a logger to the commander to output all reader responses to the log file
         [_commander addResponder:[[TSLLoggerResponder alloc] init]];
-
+        
         // Some synchronous commands will be used in the app
         [_commander addSynchronousResponder];
-
+        
         // The TSLInventoryCommand is a TSLAsciiResponder for inventory responses and can have a delegate
         // (id<TSLInventoryCommandTransponderReceivedDelegate>) that is informed of each transponder as it is received
-
+        
         // Create a TSLInventoryCommand
         _inventoryResponder = [[TSLInventoryCommand alloc] init];
-
+        
         // Add self as the transponder delegate
         _inventoryResponder.transponderReceivedDelegate = self;
-
+        
         // Pulling the Reader trigger will generate inventory responses that are not from the library.
         // To ensure these are also seen requires explicitly requesting handling of non-library command responses
         _inventoryResponder.captureNonLibraryResponses = YES;
-
+        
         // Add the inventory responder to the commander's responder chain
         [_commander addResponder:_inventoryResponder];
-
+        
         // Ensure the reader is in a known (default) state
         // No information is returned by the reset command other than its succesful completion
         TSLFactoryDefaultsCommand * resetCommand = [TSLFactoryDefaultsCommand synchronousCommand];
-
+        
         [_commander executeCommand:resetCommand];
-
+        
         // Notify user device has been reset
         if( resetCommand.isSuccessful )
         {
@@ -118,28 +123,108 @@
         {
             NSLog(@"!!! Unable to reset reader to Factory Defaults !!!\n");
         }
-
+        
         // Get version information for the reader
         // Use the TSLVersionInformationCommand synchronously as the returned information is needed below
         TSLVersionInformationCommand * versionCommand = [TSLVersionInformationCommand synchronousCommand];
-
+        
         [_commander executeCommand:versionCommand];
-
+        
         // Log some of the values obtained
         NSLog( @"\n%-16s %@\n%-16s %@\n%-16s %@\n\n\n",
               "Manufacturer:", versionCommand.manufacturer,
               "Serial Number:", versionCommand.serialNumber,
               "Antenna SN:", versionCommand.antennaSerialNumber
               );
-
-
+        
+        
         _resultMessage = [NSString stringWithFormat:@"%@ is connected.", versionCommand.serialNumber];
         _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:_resultMessage];
         [_pluginResult setKeepCallbackAsBool:YES];
-        [self.commandDelegate sendPluginResult:_pluginResult callbackId:_command.callbackId];
+        [self.commandDelegate sendPluginResult:_pluginResult callbackId:cordovaComm.callbackId];
         _resultMessage = @"";
-            
+        
     }];
+}
+
+-(void)write:(CDVInvokedUrlCommand*)cordovaComm
+{
+    @try
+    {
+        NSString* epc = [cordovaComm.arguments objectAtIndex:0];
+        NSString* writeData = [cordovaComm.arguments objectAtIndex:1];
+        //Creates a command for writing to a tag, but it must be configured
+        TSLWriteSingleTransponderCommand* command = [TSLWriteSingleTransponderCommand synchronousCommand];
+        
+        // Use the select parameters to write to a single tag
+        // Set the match pattern to the full EPC
+        command.selectBank = TSL_DataBank_ElectronicProductCode;
+        command.selectData = epc;
+        command.selectOffset = 32;                                  // This offset is in bits
+        command.selectLength = (int)epc.length * 4;   // This length is in bits
+        
+        //Default password for open tag
+        command.accessPassword = 0;
+        
+        //Set bank to EPC
+        command.bank = TSL_DataBank_ElectronicProductCode;
+        
+        //Set the data to be written
+        command.data = [TSLBinaryEncoding fromBase16String:writeData];
+        
+        // Set the locations to write to - this demo writes all the data supplied
+        command.offset = 0;
+        command.length = (int)command.data.length / 2;       // This length is in words
+        
+        // Use a Block to capture details of the transponder written (there can be at most one)
+        //
+        // Note: transponderReceivedBlock is invoked on a non-UI thread so to update the UI would require dispatch_async()
+        // to the UI thread. This would then arrive after this method completes
+        //
+        __block NSString *transponderDetailsMessage = @"";
+        command.transponderReceivedBlock = ^(NSString *epc, NSNumber *crc, NSNumber *pc, NSNumber *rssi, NSNumber *index, NSNumber *wordsWritten, BOOL moreAvailable)
+        {
+            if( wordsWritten != nil )
+            {
+                transponderDetailsMessage = [NSString stringWithFormat:@"%-16s%@\n",
+                                             "Words Written:", wordsWritten
+                                             ];
+            }
+        };
+        
+        // Execute the command
+        [_commander executeCommand:command];
+        
+        
+        // Display the target transponder
+        NSLog(@"Write to: %@\n", epc);
+        NSLog(@"%@",transponderDetailsMessage);
+        
+        // Display the outcome of the
+        if( command.isSuccessful )
+        {
+            NSLog(@"Data written successfully");
+        }
+        else
+        {
+            NSLog(@"Data write FAILED:\n");
+            for (NSString *msg in command.messages)
+            {
+                NSLog(@"%@\n", msg);
+            }
+        }
+    }
+    @catch (NSException *exception)
+    {
+        NSLog(@"Exception: %@\n\n", exception.reason);
+    }
+    
+    _resultMessage = @"Write callback";
+    _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:_resultMessage];
+    [_pluginResult setKeepCallbackAsBool:YES];
+    [self.commandDelegate sendPluginResult:_pluginResult callbackId:cordovaComm.callbackId];
+    _resultMessage = @"";
+
 }
 
 -(NSInteger)getGunIndex
@@ -164,6 +249,16 @@
     NSLog(@"transponderReceived Called");
     // Append the transponder EPC identifier and RSSI to the results
     //_partialResultMessage = [_partialResultMessage stringByAppendingFormat:@"%-28s  %4d\n", [epc UTF8String], [rssi intValue]];
+    
+    // unsigned int baseTenVal;
+    //NSScanner* scanner = [NSScanner scannerWithString:epc];
+    //[scanner scanHexInt:&baseTenVal];
+    
+    //NSLog(@"epc: %@",epc);
+    //    NSLog(@"crc: %@",crc);
+    //    NSLog(@"pc: %@",pc);
+    //    NSLog(@"rssi: %@",rssi);
+    //  NSLog(@"%d",baseTenVal);
     
     // _partialResultMessage = @"";
     _resultMessage = [_resultMessage stringByAppendingFormat:@"%-24s", [epc UTF8String]];

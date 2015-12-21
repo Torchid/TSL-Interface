@@ -10,5 +10,6 @@
 @interface TSLInterface : CDVPlugin
 
 - (void)pair:(CDVInvokedUrlCommand*)command;
+- (void)write:(CDVInvokedUrlCommand*)cordCommand;
 - (NSInteger)getGunIndex;
 @end
