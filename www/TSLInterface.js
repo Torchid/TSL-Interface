@@ -12,5 +12,12 @@ module.exports = {
                      "TSLInterface",
                      "write",
                      [tagID, writeData]);
-    }
+    },
+   read: function(tagID, successCallback, failCallback) {
+   cordova.exec(successCallback,
+                failCallback,
+                "TSLInterface",
+                "read",
+                [tagID]);
+   }
 };

@@ -11,5 +11,6 @@
 
 - (void)pair:(CDVInvokedUrlCommand*)command;
 - (void)write:(CDVInvokedUrlCommand*)cordCommand;
+- (void)read:(CDVInvokedUrlCommand*)cordovaComm epc:(NSString*)epc;
 - (NSInteger)getGunIndex;
 @end
