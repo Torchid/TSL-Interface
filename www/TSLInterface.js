@@ -6,18 +6,18 @@ module.exports = {
                      "pair",
                      ["firstArgument"]);
     },
+    read: function(tagID, successCallback, failCallback) {
+        cordova.exec(successCallback,
+                    failCallback,
+                    "TSLInterface",
+                    "read",
+                    [tagID]);
+   },
     write: function(tagID, writeData, successCallback, failCallback) {
         cordova.exec(successCallback,
                      failCallback,
                      "TSLInterface",
                      "write",
                      [tagID, writeData]);
-    },
-   read: function(tagID, successCallback, failCallback) {
-   cordova.exec(successCallback,
-                failCallback,
-                "TSLInterface",
-                "read",
-                [tagID]);
-   }
+    }
 };

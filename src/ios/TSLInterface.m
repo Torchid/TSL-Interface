@@ -42,9 +42,12 @@
 
 @implementation TSLInterface
 
+//Pair the app to a Bluetooth-connected RFID device and send the inventory command
+//to the device.  The inventory command allows the gun's trigger to be pulled to
+//identify all nearby tags.
 -(void)pair:(CDVInvokedUrlCommand*)cordovaComm
 {
-    [self.commandDelegate runInBackground:^{
+    //[self.commandDelegate runInBackground:^{
         _pluginResult = nil;
         _resultMessage = @"";
         _transpondersSeen = 0;
@@ -57,6 +60,7 @@
         // Create the TSLAsciiCommander used to communicate with the TSL Reader
         _commander = [[TSLAsciiCommander alloc] init];
         _accessoryList = [[EAAccessoryManager sharedAccessoryManager] connectedAccessories];
+        _transpondersRead = [[NSMutableDictionary alloc] init];
         
         do
         {
@@ -140,21 +144,123 @@
               "Antenna SN:", versionCommand.antennaSerialNumber
               );
         
-        
-        [self read:nil epc:@"0000000008002216572D0745"];
-        
         _resultMessage = [NSString stringWithFormat:@"%@ is connected.", versionCommand.serialNumber];
         _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:_resultMessage];
         [_pluginResult setKeepCallbackAsBool:YES];
         [self.commandDelegate sendPluginResult:_pluginResult callbackId:cordovaComm.callbackId];
         _resultMessage = @"";
         
-    }];
+   // }];
 }
 
+//Once tags have been identified by the inventory command, the retrieved EPC numbers can be passed
+//to the read function to pull more detailed data off the tags.  This function is reading the
+//tag's user data.
+- (void)read:(CDVInvokedUrlCommand*)cordovaComm
+{
+    //  [self.commandDelegate runInBackground:^{
+    // BOOL parametersValid = [self extractAndValidateTransponderInformation:YES];
+    
+    NSString* epc = [cordovaComm.arguments objectAtIndex:0];
+    NSString* readResult = @"";
+    
+    // Display the target transponder
+    NSLog(@"Read from: %@", epc);
+    
+    @try
+    {
+        _readCommand = [[TSLReadTransponderCommand alloc] init];
+        _readCommand = [TSLReadTransponderCommand synchronousCommand];
+        //_readCommand = [[TSLReadTransponderCommand alloc] init];
+        
+        // Configure the command
+        
+        // Use the select parameters to write to a single tag
+        // Set the match pattern to the full EPC
+        _readCommand.selectBank = TSL_DataBank_ElectronicProductCode;
+        _readCommand.selectData = epc;
+        _readCommand.selectOffset = 32;                                  // This offset is in bits
+        _readCommand.selectLength = (int)epc.length * 4;   // This length is in bits
+        
+        
+        // Set the locations to read from
+        _readCommand.offset = 0;
+        _readCommand.length = 8;
+        
+        // This demo only works with open tags
+        _readCommand.accessPassword = 0;
+        
+        // Set the bank to be used
+        _readCommand.bank = TSL_DataBank_User;
+        
+        // Set self as delgate to listen for each transponder read - there may be more than one that can match
+        // the given EPC
+        // Note: this demo is not designed to differentiate multiple responses
+        _readCommand.transponderReceivedDelegate = (id)self;
+        
+        // Collect the responses in a dictionary
+        _transpondersRead = [NSMutableDictionary dictionary];
+        
+        //_readCommand.transponderReceivedBlock = ^(NSString *epc, NSNumber *crc, NSNumber *pc, NSNumber *rssi, NSNumber *index, NSData *readData, BOOL moreAvailable)
+        //{
+        //   NSLog(@"Block called");
+        //};
+        
+        // Execute the command
+        
+        //BOOL readWasExecuted = false;
+        
+        //     do{
+        //       if([_commander isResponsive]){
+        [_commander executeCommand:_readCommand];
+        //         readWasExecuted = true;
+        //   }
+        // }while(!readWasExecuted);
+        
+        // Display the data returned
+        if( _transpondersRead.count == 0 )
+        {
+            readResult = @"Transponder not found.";
+        }
+        else
+        {
+            // There should only be one response in the dictionary
+            for( NSData *tagData in [_transpondersRead objectEnumerator] )
+            {
+                if( tagData.length != 0 )
+                {
+                    readResult = [readResult stringByAppendingString:[TSLBinaryEncoding toBase16String:tagData]];
+                }
+                else
+                {
+                    readResult = @"None defined.";
+                }
+            }
+        }
+        // }
+        //        else
+        //        {
+        //            self.resultsTextView.text = [self.resultsTextView.text stringByAppendingString:@"Check the parameters!"];
+        //
+        //        }
+    }
+    @catch (NSException *exception)
+    {
+        NSLog(@"Exception: %@\n\n", exception.reason);
+    }
+    
+    NSLog(@"Final read result: %@", readResult);
+    _pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:readResult];
+    [_pluginResult setKeepCallbackAsBool:NO];
+    [self.commandDelegate sendPluginResult:_pluginResult callbackId:cordovaComm.callbackId];
+    // }];
+}
+
+//Tags that have been identified by the inventory command with an EPC number can now be written to
+//with this function.  It overwrites the user data field.
 -(void)write:(CDVInvokedUrlCommand*)cordovaComm
 {
-    [self.commandDelegate runInBackground:^{
+  //  [self.commandDelegate runInBackground:^{
         @try
         {
             NSString* epc = [cordovaComm.arguments objectAtIndex:0];
@@ -163,7 +269,7 @@
             TSLWriteSingleTransponderCommand* command = [TSLWriteSingleTransponderCommand synchronousCommand];
             
             NSLog(@"epc to find: %@", epc);
-            NSLog(@"epc to write: %@", writeData);
+            NSLog(@"data to write: %@", writeData);
             
             // Use the select parameters to write to a single tag
             // Set the match pattern to the full EPC
@@ -176,7 +282,7 @@
             command.accessPassword = 0;
             
             //Set bank to EPC
-            command.bank = TSL_DataBank_ElectronicProductCode;
+            command.bank = TSL_DataBank_User;
             
             //Set the data to be written
             command.data = [TSLBinaryEncoding fromBase16String:writeData];
@@ -217,7 +323,7 @@
         [_pluginResult setKeepCallbackAsBool:YES];
         [self.commandDelegate sendPluginResult:_pluginResult callbackId:cordovaComm.callbackId];
         _resultMessage = @"";
-    }];
+   // }];
 }
 
 -(NSInteger)getGunIndex
@@ -229,14 +335,12 @@
     return -1;
 }
 
+//Receiver method for the inventory command (specified in the pair function)
+//Each transponder received from the reader is passed to this method
+//Parameters epc, crc, pc, and rssi may be nil
 //
-// Each transponder received from the reader is passed to this method
+//Note: This is an asynchronous call from a separate thread
 //
-// Parameters epc, crc, pc, and rssi may be nil
-//
-// Note: This is an asynchronous call from a separate thread
-//
-// TEST: Currently only looking at epc result
 -(void)transponderReceived:(NSString *)epc crc:(NSNumber *)crc pc:(NSNumber *)pc rssi:(NSNumber *)rssi fastId:(NSData *)fastId moreAvailable:(BOOL)moreAvailable
 {
     // Append the transponder EPC identifier and RSSI to the results
@@ -274,103 +378,13 @@
     }
 }
 
-- (void)read:(CDVInvokedUrlCommand*)cordovaComm epc:(NSString *)epc
-{
-    [self.commandDelegate runInBackground:^{
-       // BOOL parametersValid = [self extractAndValidateTransponderInformation:YES];
-        
-        
-        // Display the target transponder
-        NSLog(@"Read from: %@", epc);
-        
-        @try
-        {
-            _readCommand = [[TSLReadTransponderCommand alloc] init];
-            _readCommand = [TSLReadTransponderCommand synchronousCommand];
-            //_readCommand = [[TSLReadTransponderCommand alloc] init];
-            
-            // Configure the command
-            
-            // Use the select parameters to write to a single tag
-            // Set the match pattern to the full EPC
-            _readCommand.selectBank = TSL_DataBank_ElectronicProductCode;
-            _readCommand.selectData = epc;
-            _readCommand.selectOffset = 32;                                  // This offset is in bits
-            _readCommand.selectLength = (int)epc.length * 4;   // This length is in bits
-        
-        
-            // Set the locations to read from
-            _readCommand.offset = 0;
-            _readCommand.length = 8;
-            
-            // This demo only works with open tags
-            _readCommand.accessPassword = 0;
-            
-            // Set the bank to be used
-            _readCommand.bank = TSL_DataBank_User;
-            
-            // Set self as delgate to listen for each transponder read - there may be more than one that can match
-            // the given EPC
-            // Note: this demo is not designed to differentiate multiple responses
-            _readCommand.transponderReceivedDelegate = (id)self;
-            
-            // Collect the responses in a dictionary
-            _transpondersRead = [NSMutableDictionary dictionary];
-            
-            //_readCommand.transponderReceivedBlock = ^(NSString *epc, NSNumber *crc, NSNumber *pc, NSNumber *rssi, NSNumber *index, NSData *readData, BOOL moreAvailable)
-            //{
-            //   NSLog(@"Block called");
-            //};
-            
-            // Execute the command
-            [_commander executeCommand:_readCommand];
-            
-            // Display the data returned
-            if( _transpondersRead.count == 0 )
-            {
-                NSLog(@"No transponders responded");
-            }
-            else
-            {
-                // There should only be one response in the dictionary
-                for( NSData *tagData in [_transpondersRead objectEnumerator] )
-                {
-                    if( tagData.length != 0 )
-                    {
-                        NSLog(@"%@\n\n", [TSLBinaryEncoding toBase16String:tagData]);
-                    }
-                    else
-                    {
-                        NSLog(@"No data returned\n\n");
-                    }
-                }
-            }
-            // }
-            //        else
-            //        {
-            //            self.resultsTextView.text = [self.resultsTextView.text stringByAppendingString:@"Check the parameters!"];
-            //            
-            //        }
-        }
-        @catch (NSException *exception)
-        {
-            NSLog(@"Exception: %@\n\n", exception.reason);
-        }
-    }];
-}
-
-
 //
-// Collect the responses to the read action
-//
-// Note: This demo assumes that there is only one transponder in range with the
-// given identifier. If more than one response is received the data for the last seen transponder will be returned
+//Receiver method for the read command, specified in the read function
 //
 // (If a partial EPC match is used then more than one transponder may be returned)
 //
 -(void)transponderReceivedFromRead:(NSString *)epc crc:(NSNumber *)crc pc:(NSNumber *)pc rssi:(NSNumber *)rssi index:(NSNumber *)index data:(NSData *)readData moreAvailable:(BOOL)moreAvailable
 {
-    NSLog(@"Transponder read receiver called");
     if( epc != nil )
     {
         if( readData != nil )
@@ -385,17 +399,7 @@
 }
 
 
- //Sets the values for the Read/Write
-
- //The values are checked for basic correctness
- //Set useReadParameters to YES if the read parameters are to be used otherwise the
- //write values will be set
-
- //Returns YES if the values are valid
- //(See the log for error details)
-
-
-//Following methods control commander when app enters and exits background.  Not yet sure if these
+//The following methods control commander when app enters and exits background.  Not yet sure if these
 //are helpful for a Cordova project.
 
 - (void)applicationDidEnterBackground:(UIApplication *)application
