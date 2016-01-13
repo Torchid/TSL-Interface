@@ -24,14 +24,14 @@ module.exports = {
         cordova.exec(function(){},
                      function(){},
                      "TSLInterface",
-                     "write",
+                     "disconnect",
                      [""]);
     },
     reconnect: function() {
         cordova.exec(function(){},
                      function(){},
                      "TSLInterface",
-                     "write",
+                     "reconnect",
                      [""]);
     }
 };
