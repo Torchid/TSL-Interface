@@ -19,5 +19,19 @@ module.exports = {
                      "TSLInterface",
                      "write",
                      [tagID, writeData]);
+    },
+    disconnect: function() {
+        cordova.exec(function(){},
+                     function(){},
+                     "TSLInterface",
+                     "write",
+                     [""]);
+    },
+    reconnect: function() {
+        cordova.exec(function(){},
+                     function(){},
+                     "TSLInterface",
+                     "write",
+                     [""]);
     }
 };

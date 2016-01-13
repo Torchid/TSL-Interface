@@ -402,18 +402,17 @@
 //The following methods control commander when app enters and exits background.  Not yet sure if these
 //are helpful for a Cordova project.
 
-- (void)applicationDidEnterBackground:(UIApplication *)application
+- (void)disconnect:(CDVInvokedUrlCommand *)cordovaComm
 {
     [_commander disconnect];
     NSLog(@"Application became inactive");
 }
 
-- (void)applicationDidBecomeActive:(UIApplication *)application
+- (void)reconnect:(CDVInvokedUrlCommand *)cordovaComm
 {
     // Attempt to reconnect to the last used accessory
     [_commander connect:nil];
     NSLog(@"Application became active");
 }
-
 
 @end
