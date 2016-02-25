@@ -1,3 +1,5 @@
+# Dropped for more generic version.  Go to: https://github.com/Torchid/CDV-RFID
+
 ### Bitcode must be disabled in XCode:
 
 	Target > Build Settings > Build Options > Enable Bitcode: No
